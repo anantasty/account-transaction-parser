@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransactionType {
     Deposit,
     Withdrawal,
@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for TransactionType {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Transaction {
     #[serde(rename = "type")]
     pub transaction_type: TransactionType,
@@ -70,7 +70,7 @@ impl Transaction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Account {
     pub client: u16,
     pub available: Decimal,
@@ -142,4 +142,159 @@ pub fn get_boxed_transaction(
     transactions: &HashMap<u32, Transaction>,
 ) -> Option<Box<Transaction>> {
     transactions.get(&tx).map(|t| Box::new(t.clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use rust_decimal::Decimal;
+    use rust_decimal::prelude::Zero;
+    use crate::{Account, Transaction, TransactionType};
+
+    fn read_transaction(line: &str) -> Transaction {
+        let mut reader = csv::Reader::from_reader(line.as_bytes());
+        reader.deserialize().next().unwrap().unwrap()
+    }
+
+    #[test]
+    fn parse_transaction() {
+        let result = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let line = "type,client,tx,amount
+deposit,1,1,1.0";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn parse_transaction_with_no_amount() {
+        let result = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        let line = "type,client,tx,amount
+deposit,1,1,";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn deposits() {
+        let mut account = Account {
+            client: 1,
+            available: Decimal::zero(),
+            held: Decimal::zero(),
+            locked: false,
+        };
+        let transaction = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        account.update_transaction(&transaction);
+        assert_eq!(account.available, Decimal::new(1, 0));
+        account.update_transaction(&transaction); // Add 1 again
+        assert_eq!(account.available, Decimal::new(2, 0));
+    }
+
+    #[test]
+    fn withdrawal() {
+        let mut account = Account{
+            client: 1,
+            available: Decimal::new(1, 0),
+            held: Decimal::zero(),
+            locked: false,
+        };
+        let transaction = Transaction {
+            transaction_type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        account.update_transaction(&transaction);
+        assert_eq!(account.available, Decimal::zero());
+    }
+
+    #[test]
+    fn dispute() {
+        let mut account = Account {
+            client: 1,
+            available: Decimal::new(1, 0),
+            held: Decimal::zero(),
+            locked: false,
+        };
+        let transaction_deposit = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let transaction_dispute = Transaction {
+            transaction_type: TransactionType::Dispute(Some(Box::new(transaction_deposit))),
+            client: 1,
+            tx: 2,
+            amount: None,
+        };
+        account.update_transaction(&transaction_dispute);
+        assert_eq!(account.available, Decimal::zero());
+        assert_eq!(account.held, Decimal::new(1, 0));
+    }
+
+    #[test]
+    fn resolve() {
+        let mut account = Account {
+            client: 1,
+            available: Decimal::new(1, 0),
+            held: Decimal::new(1, 0),
+            locked: false,
+        };
+        let transaction_deposit = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let transaction_resolve = Transaction {
+            transaction_type: TransactionType::Resolve(Some(Box::new(transaction_deposit))),
+            client: 1,
+            tx: 2,
+            amount: None,
+        };
+        account.update_transaction(&transaction_resolve);
+        assert_eq!(account.available, Decimal::new(2, 0));
+        assert_eq!(account.held, Decimal::zero());
+    }
+
+    #[test]
+    fn chargeback() {
+        let mut account = Account {
+            client: 1,
+            available: Decimal::new(1, 0),
+            held: Decimal::new(1, 0),
+            locked: false,
+        };
+        let transaction_chargeback = Transaction {
+            transaction_type: TransactionType::Chargeback(Some(Box::new(
+                Transaction {
+                    transaction_type: TransactionType::Deposit,
+                    client: 1,
+                    tx: 1,
+                    amount: Some(Decimal::new(1, 0)),
+                },
+            ))),
+            client: 1,
+            tx: 2,
+            amount: None,
+        };
+        account.update_transaction(&transaction_chargeback);
+        assert_eq!(account.available, Decimal::zero());
+        assert_eq!(account.held, Decimal::zero());
+        assert_eq!(account.locked, true);
+    }
 }
