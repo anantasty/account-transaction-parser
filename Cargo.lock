@@ -3,15 +3,6 @@
 version = 3
 
 [[package]]
-name = "account-transaction-parser"
-version = "0.1.0"
-dependencies = [
- "csv",
- "rust_decimal",
- "serde",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,6 +145,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "transaction_parser"
+version = "0.1.0"
+dependencies = [
+ "csv",
+ "rust_decimal",
+ "serde",
 ]
 
 [[package]]
