@@ -35,6 +35,8 @@
 - These in-memory maps are also only scoped for the duration of the file thus will need to leverage a global store(DB, Memcache, Redis, etc) to allow distributed processing.
 - The input file is not read upfront but rather read and processed at the same time - this would allow for easy expansion to using a stream or set of streams
 - The main method has been kept slim and the functions are fairly modular to allow future expansion.
+- Code was verified for issues using `cargo clippy`
+- The `cargo audit`  command from the `cargo-audit` crate was used to scan for vulnerabilities and to ensure the code is safe.
 
 ## Background 
 ### Input
