@@ -11,7 +11,7 @@ use std::io;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionType {
     Deposit,
     Withdrawal,
@@ -55,7 +55,7 @@ impl<'de> Deserialize<'de> for TransactionType {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Transaction {
     #[serde(rename = "type")]
     pub transaction_type: TransactionType,
@@ -90,7 +90,7 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Account {
     pub client: u16,
     pub available: Decimal,
@@ -131,28 +131,25 @@ impl Account {
             TransactionType::Withdrawal => {
                 self.available -= transaction.amount();
             }
-            TransactionType::Dispute(ref_transaction) => match ref_transaction {
-                Some(box t) => {
+            TransactionType::Dispute(ref_transaction) => {
+                if let Some(box t) = ref_transaction {
                     self.held += t.amount();
                     self.available -= t.amount();
                 }
-                _ => (),
-            },
-            TransactionType::Resolve(ref_transaction) => match ref_transaction {
-                Some(box t) => {
+            }
+            TransactionType::Resolve(ref_transaction) => {
+                if let Some(box t) = ref_transaction {
                     self.held -= t.amount();
                     self.available += t.amount();
                 }
-                _ => (),
-            },
-            TransactionType::Chargeback(ref_transaction) => match ref_transaction {
-                Some(box t) => {
+            }
+            TransactionType::Chargeback(ref_transaction) => {
+                if let Some(box t) = ref_transaction {
                     self.held -= t.amount();
                     self.available -= t.amount();
                     self.locked = true;
                 }
-                _ => (),
-            },
+            }
         }
     }
 }
@@ -177,41 +174,39 @@ pub fn process_transactions(reader: &mut Reader<File>) -> HashMap<u16, Account> 
     // maintain map or Deposit/ Withdrawal transactions
     // To use with Dispute/ Resolve/ Chargeback transactions
     let mut transactions: HashMap<u32, Transaction> = HashMap::new();
-    for record in reader.deserialize::<Transaction>() {
-        if let Ok(mut transaction) = record {
-            match transaction.transaction_type {
-                TransactionType::Deposit | TransactionType::Withdrawal => {
-                    transactions.insert(transaction.tx, transaction.clone());
-                }
-                // Since we were not able to read linked transaction during parsing
-                // We link them using our Map of transactions
-                TransactionType::Dispute(ref _t)
-                | TransactionType::Chargeback(ref _t)
-                | TransactionType::Resolve(ref _t) => {
-                    transaction.link_transaction(&transactions);
-                }
+    for mut transaction in reader.deserialize::<Transaction>().flatten() {
+        match transaction.transaction_type {
+            TransactionType::Deposit | TransactionType::Withdrawal => {
+                transactions.insert(transaction.tx, transaction.clone());
             }
+            // Since we were not able to read linked transaction during parsing
+            // We link them using our Map of transactions
+            TransactionType::Dispute(ref _t)
+            | TransactionType::Chargeback(ref _t)
+            | TransactionType::Resolve(ref _t) => {
+                transaction.link_transaction(&transactions);
+            }
+        }
 
-            // Get an account or Create a new account with 0 balance
-            // Then Update it
-            let account = accounts.entry(transaction.client).or_insert(Account {
-                client: transaction.client,
-                available: Decimal::new(0, 0),
-                held: Decimal::new(0, 0),
-                locked: false,
-            });
-            account.update_transaction(&transaction);
-        };
+        // Get an account or Create a new account with 0 balance
+        // Then Update it
+        let account = accounts.entry(transaction.client).or_insert(Account {
+            client: transaction.client,
+            available: Decimal::new(0, 0),
+            held: Decimal::new(0, 0),
+            locked: false,
+        });
+        account.update_transaction(&transaction);
     }
     accounts
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use crate::{Account, get_boxed_transaction, Transaction, TransactionType};
+    use crate::{get_boxed_transaction, Account, Transaction, TransactionType};
     use rust_decimal::prelude::Zero;
     use rust_decimal::Decimal;
+    use std::collections::HashMap;
 
     fn read_transaction(line: &str) -> Transaction {
         let mut reader = csv::Reader::from_reader(line.as_bytes());
@@ -435,7 +430,8 @@ deposit,1,1,";
             tx: 1,
             amount: None,
         };
-        let transaction_map: HashMap<u32, Transaction> = HashMap::from([(1u32, transaction_deposit.clone())]);
+        let transaction_map: HashMap<u32, Transaction> =
+            HashMap::from([(1u32, transaction_deposit.clone())]);
         let boxed = get_boxed_transaction(1u32, &transaction_map);
         assert_eq!(boxed, Some(Box::new(transaction_deposit)));
         transaction_dispute.link_transaction(&transaction_map);
