@@ -14,6 +14,7 @@ use std::str::FromStr;
 /// # TransactionParser
 ///
 
+/// Types of possible transactions
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionType {
     Deposit,
@@ -61,6 +62,7 @@ impl<'de> Deserialize<'de> for TransactionType {
     }
 }
 
+/// Parsed data - Each row results in a transaction object.
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Transaction {
     #[serde(rename = "type")]
@@ -99,6 +101,7 @@ impl Transaction {
     }
 }
 
+/// Account to hold data of an account
 #[derive(Debug, PartialEq, Eq)]
 pub struct Account {
     pub client: u16,
@@ -165,7 +168,7 @@ impl Account {
     }
 }
 
-pub fn get_boxed_transaction(
+fn get_boxed_transaction(
     tx: u32,
     transactions: &HashMap<u32, Transaction>,
 ) -> Option<Box<Transaction>> {
@@ -173,6 +176,7 @@ pub fn get_boxed_transaction(
     transactions.get(&tx).map(|t| Box::new(t.clone()))
 }
 
+/// Outputs accounts to stdout
 pub fn write_stdout(accounts: &HashMap<u16, Account>) {
     let mut writer = csv::Writer::from_writer(io::stdout());
     for account in accounts.values() {
@@ -180,7 +184,9 @@ pub fn write_stdout(accounts: &HashMap<u16, Account>) {
     }
 }
 
-/// split function from main to make it easier to test
+/// Accepts a reader object.
+/// The function reads file line by line - creates a transaction per line
+/// stores relevant value in an accounts map
 pub fn process_transactions(reader: &mut Reader<File>) -> HashMap<u16, Account> {
     let mut accounts: HashMap<u16, Account> = HashMap::new();
     // maintain map or Deposit/ Withdrawal transactions
