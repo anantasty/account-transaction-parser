@@ -69,15 +69,15 @@ impl Transaction {
         match &self.transaction_type {
             TransactionType::Dispute(_t) => {
                 self.transaction_type =
-                    TransactionType::Dispute(get_boxed_transaction(self.tx, &transactions));
+                    TransactionType::Dispute(get_boxed_transaction(self.tx, transactions));
             }
             TransactionType::Chargeback(_t) => {
                 self.transaction_type =
-                    TransactionType::Chargeback(get_boxed_transaction(self.tx, &transactions));
+                    TransactionType::Chargeback(get_boxed_transaction(self.tx, transactions));
             }
             TransactionType::Resolve(_t) => {
                 self.transaction_type =
-                    TransactionType::Resolve(get_boxed_transaction(self.tx, &transactions));
+                    TransactionType::Resolve(get_boxed_transaction(self.tx, transactions));
             }
             _ => {}
         }
