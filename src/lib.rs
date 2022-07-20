@@ -1,12 +1,12 @@
 #![feature(box_patterns)]
 
-use std::io::{Error, ErrorKind};
-use std::str::FromStr;
-use std::collections::HashMap;
 use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TransactionType {
@@ -44,8 +44,8 @@ impl FromStr for TransactionType {
 
 impl<'de> Deserialize<'de> for TransactionType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(serde::de::Error::custom)
@@ -84,8 +84,8 @@ pub struct Account {
 // We need to implement it ourself
 impl Serialize for Account {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let mut state = serializer.serialize_struct("Account", 5)?;
         state.serialize_field("client", &self.client)?;
@@ -146,9 +146,9 @@ pub fn get_boxed_transaction(
 
 #[cfg(test)]
 mod tests {
-    use rust_decimal::Decimal;
-    use rust_decimal::prelude::Zero;
     use crate::{Account, Transaction, TransactionType};
+    use rust_decimal::prelude::Zero;
+    use rust_decimal::Decimal;
 
     fn read_transaction(line: &str) -> Transaction {
         let mut reader = csv::Reader::from_reader(line.as_bytes());
@@ -205,7 +205,7 @@ deposit,1,1,";
 
     #[test]
     fn withdrawal() {
-        let mut account = Account{
+        let mut account = Account {
             client: 1,
             available: Decimal::new(1, 0),
             held: Decimal::zero(),
@@ -280,14 +280,12 @@ deposit,1,1,";
             locked: false,
         };
         let transaction_chargeback = Transaction {
-            transaction_type: TransactionType::Chargeback(Some(Box::new(
-                Transaction {
-                    transaction_type: TransactionType::Deposit,
-                    client: 1,
-                    tx: 1,
-                    amount: Some(Decimal::new(1, 0)),
-                },
-            ))),
+            transaction_type: TransactionType::Chargeback(Some(Box::new(Transaction {
+                transaction_type: TransactionType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(Decimal::new(1, 0)),
+            }))),
             client: 1,
             tx: 2,
             amount: None,

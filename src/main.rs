@@ -4,7 +4,7 @@ use std::{env, io};
 use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
-use transaction_parser::{Transaction, TransactionType,Account,get_boxed_transaction};
+use transaction_parser::{get_boxed_transaction, Account, Transaction, TransactionType};
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut reader = csv::Reader::from_path(args[1].clone()).unwrap();
