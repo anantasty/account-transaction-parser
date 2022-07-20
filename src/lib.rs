@@ -5,6 +5,7 @@ use rust_decimal::Decimal;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::io;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
@@ -62,6 +63,25 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    pub fn link_transaction(&mut self, transactions: &HashMap<u32, Transaction>) {
+        match &self.transaction_type {
+            TransactionType::Dispute(_t) => {
+                self.transaction_type =
+                    TransactionType::Dispute(get_boxed_transaction(self.tx, &transactions));
+            }
+            TransactionType::Chargeback(_t) => {
+                self.transaction_type = TransactionType::Chargeback(get_boxed_transaction(
+                    self.tx,
+                    &transactions,
+                ));
+            }
+            TransactionType::Resolve(_t) => {
+                self.transaction_type =
+                    TransactionType::Resolve(get_boxed_transaction(self.tx, &transactions));
+            }
+            _ => {}
+        }
+    }
     fn amount(&self) -> Decimal {
         match self.amount {
             Some(amount) => amount,
@@ -144,6 +164,14 @@ pub fn get_boxed_transaction(
     transactions.get(&tx).map(|t| Box::new(t.clone()))
 }
 
+pub fn write_stdout(accounts: &HashMap<u16, Account>) {
+    let mut writer = csv::Writer::from_writer(io::stdout());
+    for account in accounts.values() {
+        writer.serialize(account).unwrap();
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use crate::{Account, Transaction, TransactionType};
@@ -156,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_transaction() {
+    fn parse_deposit() {
         let result = Transaction {
             transaction_type: TransactionType::Deposit,
             client: 1,
@@ -165,6 +193,62 @@ mod tests {
         };
         let line = "type,client,tx,amount
 deposit,1,1,1.0";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn parse_withdrawal() {
+        let result = Transaction {
+            transaction_type: TransactionType::Withdrawal,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let line = "type,client,tx,amount
+withdrawal,1,1,1.0";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn parse_chargeback() {
+        let result = Transaction {
+            transaction_type: TransactionType::Chargeback(None),
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let line = "type,client,tx,amount
+chargeback,1,1,1.0";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn parse_dispute() {
+        let result = Transaction {
+            transaction_type: TransactionType::Dispute(None),
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let line = "type,client,tx,amount
+dispute,1,1,1.0";
+        let record: Transaction = read_transaction(line);
+        assert_eq!(result, record);
+    }
+
+    #[test]
+    fn parse_resolve() {
+        let result = Transaction {
+            transaction_type: TransactionType::Resolve(None),
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let line = "type,client,tx,amount
+resolve,1,1,1.0";
         let record: Transaction = read_transaction(line);
         assert_eq!(result, record);
     }

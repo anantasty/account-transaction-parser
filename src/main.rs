@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::{env, io};
+use std::env;
 
-use rust_decimal::prelude::Zero;
+
 use rust_decimal::Decimal;
 
-use transaction_parser::{get_boxed_transaction, Account, Transaction, TransactionType};
+use transaction_parser::{Account, Transaction, TransactionType, write_stdout};
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut reader = csv::Reader::from_path(args[1].clone()).unwrap();
@@ -18,21 +19,15 @@ fn main() {
             TransactionType::Deposit | TransactionType::Withdrawal => {
                 transactions.insert(transaction.tx, transaction.clone());
             }
-            TransactionType::Dispute(_t) => {
-                transaction.transaction_type =
-                    TransactionType::Dispute(get_boxed_transaction(transaction.tx, &transactions));
-            }
-            TransactionType::Chargeback(_t) => {
-                transaction.transaction_type = TransactionType::Chargeback(get_boxed_transaction(
-                    transaction.tx,
-                    &transactions,
-                ));
-            }
-            TransactionType::Resolve(_t) => {
-                transaction.transaction_type =
-                    TransactionType::Resolve(get_boxed_transaction(transaction.tx, &transactions));
+            // Since we were not able to read linked transaction during parsing
+            // We link them using our Map of transactions
+            TransactionType::Dispute(ref _t) | TransactionType::Chargeback(ref _t) | TransactionType::Resolve(ref _t) => {
+                transaction.link_transaction(&transactions);
             }
         }
+
+        // Get an account or Create a new account with 0 balance
+        // Then Update it
         let account = accounts.entry(transaction.client).or_insert(Account {
             client: transaction.client,
             available: Decimal::new(0, 0),
@@ -41,8 +36,5 @@ fn main() {
         });
         account.update_transaction(&transaction);
     }
-    let mut writer = csv::Writer::from_writer(io::stdout());
-    for account in accounts.values() {
-        writer.serialize(account).unwrap();
-    }
+    write_stdout(&accounts);
 }
