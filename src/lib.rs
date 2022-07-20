@@ -208,7 +208,8 @@ pub fn process_transactions(reader: &mut Reader<File>) -> HashMap<u16, Account> 
 
 #[cfg(test)]
 mod tests {
-    use crate::{Account, Transaction, TransactionType};
+    use std::collections::HashMap;
+    use crate::{Account, get_boxed_transaction, Transaction, TransactionType};
     use rust_decimal::prelude::Zero;
     use rust_decimal::Decimal;
 
@@ -412,5 +413,32 @@ deposit,1,1,";
         assert_eq!(account.available, Decimal::zero());
         assert_eq!(account.held, Decimal::zero());
         assert_eq!(account.locked, true);
+    }
+
+    #[test]
+    fn link_transaction() {
+        let transaction_deposit = Transaction {
+            transaction_type: TransactionType::Deposit,
+            client: 1,
+            tx: 1,
+            amount: Some(Decimal::new(1, 0)),
+        };
+        let mut transaction_dispute = Transaction {
+            transaction_type: TransactionType::Dispute(None),
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        let transaction_dispute_result = Transaction {
+            transaction_type: TransactionType::Dispute(Some(Box::new(transaction_deposit.clone()))),
+            client: 1,
+            tx: 1,
+            amount: None,
+        };
+        let transaction_map: HashMap<u32, Transaction> = HashMap::from([(1u32, transaction_deposit.clone())]);
+        let boxed = get_boxed_transaction(1u32, &transaction_map);
+        assert_eq!(boxed, Some(Box::new(transaction_deposit)));
+        transaction_dispute.link_transaction(&transaction_map);
+        assert_eq!(transaction_dispute, transaction_dispute_result);
     }
 }
