@@ -10,6 +10,9 @@ use std::fs::File;
 use std::io;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
+///
+/// # TransactionParser
+///
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionType {
@@ -25,6 +28,8 @@ pub enum TransactionType {
     Chargeback(Option<Box<Transaction>>),
 }
 
+/// Serialization for TransactionType
+/// We need this to let serde play well with parsing our enums
 impl FromStr for TransactionType {
     type Err = Error;
 
@@ -45,6 +50,7 @@ impl FromStr for TransactionType {
     }
 }
 
+/// serde + csv enum parsing code
 impl<'de> Deserialize<'de> for TransactionType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -65,6 +71,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    /// Link relevant transaction to Dispute, Chargeback or Resolve transaction
     pub fn link_transaction(&mut self, transactions: &HashMap<u32, Transaction>) {
         match &self.transaction_type {
             TransactionType::Dispute(_t) => {
@@ -82,6 +89,8 @@ impl Transaction {
             _ => {}
         }
     }
+
+    /// Get account balance with a default value of Zero instead of None
     fn amount(&self) -> Decimal {
         match self.amount {
             Some(amount) => amount,
@@ -98,11 +107,12 @@ pub struct Account {
     pub locked: bool,
 }
 
-// Since we need to serialize the account
-// With all fields and the total fiend which is computed
-// We cant use the #[derive(Serialize)] macro
-// We need to implement it ourself
+/// Serialization for Account
 impl Serialize for Account {
+    // Since we need to serialize the account
+    // With all fields and the total fiend which is computed
+    // We cant use the #[derive(Serialize)] macro
+    // We need to implement it ourself
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -118,11 +128,12 @@ impl Serialize for Account {
 }
 
 impl Account {
+    /// Return the value of held + available of the account
     pub fn total(&self) -> Decimal {
         self.available + self.held
     }
 
-    // Update accounts based on received transaction
+    /// Update accounts based on received transaction
     pub fn update_transaction(&mut self, transaction: &Transaction) {
         match &transaction.transaction_type {
             TransactionType::Deposit => {
@@ -158,6 +169,7 @@ pub fn get_boxed_transaction(
     tx: u32,
     transactions: &HashMap<u32, Transaction>,
 ) -> Option<Box<Transaction>> {
+    /// Convenience method to convert Option<Transaction> to Option<Box<Transaction>>
     transactions.get(&tx).map(|t| Box::new(t.clone()))
 }
 
@@ -168,7 +180,7 @@ pub fn write_stdout(accounts: &HashMap<u16, Account>) {
     }
 }
 
-// split function from main to make it easier to test
+/// split function from main to make it easier to test
 pub fn process_transactions(reader: &mut Reader<File>) -> HashMap<u16, Account> {
     let mut accounts: HashMap<u16, Account> = HashMap::new();
     // maintain map or Deposit/ Withdrawal transactions
