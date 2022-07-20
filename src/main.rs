@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::env;
 
-
 use rust_decimal::Decimal;
 
-use transaction_parser::{Account, Transaction, TransactionType, write_stdout};
+use transaction_parser::{write_stdout, Account, Transaction, TransactionType};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,7 +20,9 @@ fn main() {
             }
             // Since we were not able to read linked transaction during parsing
             // We link them using our Map of transactions
-            TransactionType::Dispute(ref _t) | TransactionType::Chargeback(ref _t) | TransactionType::Resolve(ref _t) => {
+            TransactionType::Dispute(ref _t)
+            | TransactionType::Chargeback(ref _t)
+            | TransactionType::Resolve(ref _t) => {
                 transaction.link_transaction(&transactions);
             }
         }

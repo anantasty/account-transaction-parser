@@ -70,10 +70,8 @@ impl Transaction {
                     TransactionType::Dispute(get_boxed_transaction(self.tx, &transactions));
             }
             TransactionType::Chargeback(_t) => {
-                self.transaction_type = TransactionType::Chargeback(get_boxed_transaction(
-                    self.tx,
-                    &transactions,
-                ));
+                self.transaction_type =
+                    TransactionType::Chargeback(get_boxed_transaction(self.tx, &transactions));
             }
             TransactionType::Resolve(_t) => {
                 self.transaction_type =
@@ -170,7 +168,6 @@ pub fn write_stdout(accounts: &HashMap<u16, Account>) {
         writer.serialize(account).unwrap();
     }
 }
-
 
 #[cfg(test)]
 mod tests {
