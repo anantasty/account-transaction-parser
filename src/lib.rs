@@ -1,10 +1,12 @@
 #![feature(box_patterns)]
 
+use csv::Reader;
 use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::fs::File;
 use std::io;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
@@ -167,6 +169,41 @@ pub fn write_stdout(accounts: &HashMap<u16, Account>) {
     for account in accounts.values() {
         writer.serialize(account).unwrap();
     }
+}
+
+// split function from main to make it easier to test
+pub fn process_transactions(reader: &mut Reader<File>) -> HashMap<u16, Account> {
+    let mut accounts: HashMap<u16, Account> = HashMap::new();
+    // maintain map or Deposit/ Withdrawal transactions
+    // To use with Dispute/ Resolve/ Chargeback transactions
+    let mut transactions: HashMap<u32, Transaction> = HashMap::new();
+    for record in reader.deserialize::<Transaction>() {
+        if let Ok(mut transaction) = record {
+            match transaction.transaction_type {
+                TransactionType::Deposit | TransactionType::Withdrawal => {
+                    transactions.insert(transaction.tx, transaction.clone());
+                }
+                // Since we were not able to read linked transaction during parsing
+                // We link them using our Map of transactions
+                TransactionType::Dispute(ref _t)
+                | TransactionType::Chargeback(ref _t)
+                | TransactionType::Resolve(ref _t) => {
+                    transaction.link_transaction(&transactions);
+                }
+            }
+
+            // Get an account or Create a new account with 0 balance
+            // Then Update it
+            let account = accounts.entry(transaction.client).or_insert(Account {
+                client: transaction.client,
+                available: Decimal::new(0, 0),
+                held: Decimal::new(0, 0),
+                locked: false,
+            });
+            account.update_transaction(&transaction);
+        };
+    }
+    accounts
 }
 
 #[cfg(test)]
