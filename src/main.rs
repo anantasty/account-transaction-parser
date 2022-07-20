@@ -7,6 +7,7 @@ use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 use rust_decimal::Decimal;
+use rust_decimal::prelude::Zero;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
@@ -60,7 +61,16 @@ struct Transaction {
     transaction_type: TransactionType,
     client: u16,
     tx: u32,
-    amount: Decimal,
+    amount: Option<Decimal>,
+}
+
+impl Transaction {
+    fn amount(&self) -> Decimal {
+        match self.amount {
+            Some(amount) => amount,
+            None => Decimal::zero(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -99,29 +109,29 @@ impl Account {
     fn update_transaction(&mut self, transaction: &Transaction) {
         match &transaction.transaction_type {
             TransactionType::Deposit => {
-                self.available += transaction.amount;
+                self.available += transaction.amount();
             }
             TransactionType::Withdrawal => {
-                self.available -= transaction.amount;
+                self.available -= transaction.amount();
             }
             TransactionType::Dispute(ref_transaction) => match ref_transaction {
                 Some(box t) => {
-                    self.held += t.amount;
-                    self.available -= t.amount;
+                    self.held += t.amount();
+                    self.available -= t.amount();
                 }
                 _ => (),
             },
             TransactionType::Resolve(ref_transaction) => match ref_transaction {
                 Some(box t) => {
-                    self.held -= t.amount;
-                    self.available += t.amount;
+                    self.held -= t.amount();
+                    self.available += t.amount();
                 }
                 _ => (),
             },
             TransactionType::Chargeback(ref_transaction) => match ref_transaction {
                 Some(box t) => {
-                    self.held -= t.amount;
-                    self.available -= t.amount;
+                    self.held -= t.amount();
+                    self.available -= t.amount();
                     self.locked = true;
                 }
                 _ => (),
