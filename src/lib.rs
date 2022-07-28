@@ -1,5 +1,3 @@
-#![feature(box_patterns)]
-
 use csv::Reader;
 use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
@@ -146,22 +144,32 @@ impl Account {
                 self.available -= transaction.amount();
             }
             TransactionType::Dispute(ref_transaction) => {
-                if let Some(box t) = ref_transaction {
-                    self.held += t.amount();
-                    self.available -= t.amount();
+                match ref_transaction {
+                    Some(t) => {
+                        self.held += t.amount();
+                        self.available -= t.amount();
+                    }
+                    None => {}
                 }
             }
             TransactionType::Resolve(ref_transaction) => {
-                if let Some(box t) = ref_transaction {
-                    self.held -= t.amount();
-                    self.available += t.amount();
+                match ref_transaction {
+                    Some(t) => {
+                        self.held -= t.amount();
+                        self.available += t.amount();
+                    }
+                    None => {}
                 }
+
             }
             TransactionType::Chargeback(ref_transaction) => {
-                if let Some(box t) = ref_transaction {
-                    self.held -= t.amount();
-                    self.available -= t.amount();
-                    self.locked = true;
+                match ref_transaction {
+                    Some(t) => {
+                        self.held -= t.amount();
+                        self.available -= t.amount();
+                        self.locked = true;
+                    }
+                    None => {}
                 }
             }
         }
